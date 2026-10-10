@@ -19,6 +19,8 @@ namespace Atlasd.Battlenet
         public const string LastLogoffKey = "System\\Last Logoff";
         public const string LastLogonKey = "System\\Last Logon";
         public const string NameOnlyKey = "System\\Name Only";
+        public const string NLSSaltKey = "System\\NLS Salt";
+        public const string NLSVerifierKey = "System\\NLS Verifier";
         public const string PasswordKey = "System\\Password Digest";
         public const string PortKey = "System\\Port";
         public const string ProfileAgeKey = "profile\\age";
@@ -75,6 +77,8 @@ namespace Atlasd.Battlenet
                 { new AccountKeyValue(LastLogoffKey, DateTime.Now, AccountKeyValue.ReadLevel.Owner, AccountKeyValue.WriteLevel.Internal) },
                 { new AccountKeyValue(LastLogonKey, DateTime.Now, AccountKeyValue.ReadLevel.Owner, AccountKeyValue.WriteLevel.Internal) },
                 { new AccountKeyValue(NameOnlyKey, 0, AccountKeyValue.ReadLevel.Internal, AccountKeyValue.WriteLevel.Internal) },
+                { new AccountKeyValue(NLSSaltKey, new byte[0], AccountKeyValue.ReadLevel.Internal, AccountKeyValue.WriteLevel.Internal) },
+                { new AccountKeyValue(NLSVerifierKey, new byte[0], AccountKeyValue.ReadLevel.Internal, AccountKeyValue.WriteLevel.Internal) },
                 { new AccountKeyValue(PortKey, 0, AccountKeyValue.ReadLevel.Internal, AccountKeyValue.WriteLevel.Internal) },
                 { new AccountKeyValue(PasswordKey, new byte[0], AccountKeyValue.ReadLevel.Internal, AccountKeyValue.WriteLevel.Internal) },
                 { new AccountKeyValue(ProfileAgeKey, "", AccountKeyValue.ReadLevel.Any, AccountKeyValue.WriteLevel.Owner) },

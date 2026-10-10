@@ -1,0 +1,15 @@
+ver-OSXI-0.mpq
+
+What: version-check (CheckRevision) library for Mac OS X clients. MPQ with 4 blocks; the bundle inside is an Intel i386 Mach-O named `ver-OSXI-0` (no extension), plus (signature), (listfile), (attributes). 3,374 bytes.
+SHA-256: c3514003007ce0644d67033d2bd6fbc84b42291d61137f8279efe06d38d3eaf0
+
+Source: served by useast.battle.net:6112 over BNFTP.
+Obtained: 2026-10-06 13:18 CDT, with After.BnftpFetcher.
+Request: platform XMAC, product STAR (per research/patches/bnftp-useast-mac/README.md). It was named in the 0x50 challenge reply to a XMAC logon; the same file was the answer for XMAC at W2BN, DRTL and DSHR as well (research/probes/pmac-xmac-plan.md).
+Server filetime: 2026-01-09 09:54:42 UTC (FILETIME 134124260820000000).
+
+Not: it was not fetched on 2026-10-08, and it was not fetched with product WAR3. WAR3 and W3XP probes got no 0x50 reply from useast at all (plan.md, Phase A).
+
+Other copy: research/patches/bnftp-useast-xmac-d2dv/ver-OSXI-0.mpq (byte-identical, copied 2026-10-07 from the D2 1.10 XMAC test).
+
+Used here as the version-check file Atlas serves to clients that send platform OSXI in SID_AUTH_INFO (Warcraft III Legacy 1.29.2.9231, Intel Mac).

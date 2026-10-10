@@ -61,7 +61,7 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
                         context.Client.GameState.Locale.CountryNameAbbreviated = r.ReadString();
                         context.Client.GameState.Locale.CountryName = r.ReadString();
 
-                        if (context.Client.GameState.Product == Product.ProductCode.WarcraftIIIDemo)
+                        if (Product.IsWarcraftIII(context.Client.GameState.Product))
                             context.Client.GameState.LogonType = GameState.LogonTypes.NLS;
 
                         return new SID_PING().Invoke(new MessageContext(context.Client, MessageDirection.ServerToClient, new Dictionary<string, dynamic>(){{ "token", context.Client.GameState.PingToken }}))
@@ -83,7 +83,7 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
                          */
 
                         ulong MPQFiletime = 0;
-                        string MPQFilename = "ver-IX86-1.mpq";
+                        string MPQFilename = (uint)context.Client.GameState.Platform == 0x4F535849 ? "ver-OSXI-0.mpq" : "ver-IX86-1.mpq";
                         byte[] Formula = Encoding.UTF8.GetBytes("A=3845581634 B=880823580 C=1363937103 4 A=A-S B=B-C C=C-A A=A-B");
 
                         var fileinfo = new BNFTP.File(MPQFilename).GetFileInfo();

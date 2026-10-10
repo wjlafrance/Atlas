@@ -57,6 +57,9 @@ namespace Atlasd.Battlenet.Protocols.Game
         public UInt32 ProtocolId;
         public UInt32 ServerToken;
         public UInt32 GameSearchCookie;
+        public byte[] NLSClientKey;
+        public NLSServer NLS;
+        public bool NLSChangePassword;
         public bool SpawnKey;
         public byte[] Statstring;
         public Int32 TimezoneBias;
