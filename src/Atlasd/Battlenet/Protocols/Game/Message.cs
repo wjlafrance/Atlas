@@ -86,6 +86,8 @@ namespace Atlasd.Battlenet.Protocols.Game
                 MessageIds.SID_AUTH_ACCOUNTCREATE => new SID_AUTH_ACCOUNTCREATE(buffer),
                 MessageIds.SID_AUTH_ACCOUNTLOGON => new SID_AUTH_ACCOUNTLOGON(buffer),
                 MessageIds.SID_AUTH_ACCOUNTLOGONPROOF => new SID_AUTH_ACCOUNTLOGONPROOF(buffer),
+                MessageIds.SID_AUTH_ACCOUNTCHANGE => new SID_AUTH_ACCOUNTCHANGE(buffer),
+                MessageIds.SID_AUTH_ACCOUNTCHANGEPROOF => new SID_AUTH_ACCOUNTCHANGEPROOF(buffer),
                 MessageIds.SID_SETEMAIL => new SID_SETEMAIL(buffer),
                 MessageIds.SID_FRIENDSLIST => new SID_FRIENDSLIST(buffer),
                 MessageIds.SID_FRIENDSUPDATE => new SID_FRIENDSUPDATE(buffer),

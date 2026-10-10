@@ -71,7 +71,7 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
 
             var gameState = context.Client.GameState;
 
-            if (gameState.NLS == null || gameState.NLSClientKey == null)
+            if (gameState.NLS == null || gameState.NLSClientKey == null || gameState.NLSChangePassword)
                 throw new Exceptions.GameProtocolViolationException(context.Client, $"{MessageName(Id)} must follow {MessageName((byte)MessageIds.SID_AUTH_ACCOUNTLOGON)}");
 
             if (gameState.ActiveAccount != null)

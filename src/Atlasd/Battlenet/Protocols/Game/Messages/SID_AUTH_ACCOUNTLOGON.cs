@@ -152,6 +152,7 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
             var clientKey = r.ReadBytes(NLSServer.ValueLength);
             gameState.Username = r.ReadString();
             gameState.NLS = null;
+            gameState.NLSChangePassword = false;
 
             if (!Battlenet.Common.AccountsDb.TryGetValue(gameState.Username, out Account account) || account == null ||
                 !(account.Get(Account.NLSSaltKey, new byte[0]) is byte[] salt) || salt.Length != NLSServer.ValueLength ||
