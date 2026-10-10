@@ -8,6 +8,12 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
 {
     class SID_AUTH_ACCOUNTLOGON : Message
     {
+        public enum Statuses : UInt32
+        {
+            Success = 0x00,
+            DoesNotExist = 0x01,
+        }
+
         public SID_AUTH_ACCOUNTLOGON()
         {
             Id = (byte)MessageIds.SID_AUTH_ACCOUNTLOGON;
@@ -40,22 +46,129 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
         {
             if (context == null || context.Client == null || !context.Client.Connected || context.Client.GameState == null) return false;
 
-            if (context.Direction != MessageDirection.ClientToServer)
-                throw new GameProtocolViolationException(context.Client, $"{MessageName(Id)} is not supported from the server");
+            switch (context.Direction)
+            {
+                case MessageDirection.ClientToServer:
+                    return ClientToServer(context);
+                case MessageDirection.ServerToClient:
+                    return ServerToClient(context);
+            }
 
+            return false;
+        }
+
+        private bool ServerToClient(MessageContext context)
+        {
+            /**
+             * (UINT32)    Status
+             * (UINT8)[32] Salt
+             * (UINT8)[32] Server key
+             */
+
+            var status = (Statuses)context.Arguments["status"];
+
+            Buffer = new byte[4 + 2 * NLSServer.ValueLength];
+
+            using var m = new MemoryStream(Buffer);
+            using var w = new BinaryWriter(m);
+
+            w.Write((UInt32)status);
+            if (status == Statuses.Success)
+            {
+                w.Write((byte[])context.Arguments["salt"]);
+                w.Write((byte[])context.Arguments["serverKey"]);
+            }
+
+            Logging.WriteLine(Logging.LogLevel.Debug, Logging.LogType.Client_Game, context.Client.RemoteEndPoint, $"[{Common.DirectionToString(context.Direction)}] {MessageName(Id)} ({4 + Buffer.Length} bytes) (status: 0x{(UInt32)status:X8})");
+            context.Client.Send(ToByteArray(context.Client.ProtocolType));
+            return true;
+        }
+
+        private static bool ReplyNLS(MessageContext context, Statuses status, byte[] salt = null, byte[] serverKey = null)
+        {
+            return new SID_AUTH_ACCOUNTLOGON().Invoke(new MessageContext(context.Client, MessageDirection.ServerToClient, new Dictionary<string, object>() {{ "status", status }, { "salt", salt }, { "serverKey", serverKey }}));
+        }
+
+        /// <summary>
+        /// Makes the account active for the client; returns false if the client could not be registered as online.
+        /// </summary>
+        public static bool Activate(MessageContext context, Account account)
+        {
+            var gameState = context.Client.GameState;
+
+            gameState.ActiveAccount = account;
+            gameState.FailedLogons = (UInt32)account.Get(Account.FailedLogonsKey, (UInt32)0);
+            gameState.LastLogon = (DateTime)account.Get(Account.LastLogonKey, DateTime.Now);
+
+            account.Set(Account.IPAddressKey, context.Client.RemoteEndPoint.ToString().Split(":")[0]);
+            account.Set(Account.LastLogonKey, DateTime.Now);
+            account.Set(Account.PortKey, context.Client.RemoteEndPoint.ToString().Split(":")[1]);
+
+            var serial = 1;
+            var onlineName = gameState.Username;
+            while (!Battlenet.Common.ActiveAccounts.TryAdd(onlineName, account)) onlineName = $"{gameState.Username}#{++serial}";
+            gameState.OnlineName = onlineName;
+
+            gameState.Username = (string)account.Get(Account.UsernameKey, gameState.Username);
+
+            if (!Battlenet.Common.ActiveGameStates.TryAdd(gameState.OnlineName, gameState))
+            {
+                Logging.WriteLine(Logging.LogLevel.Error, Logging.LogType.Client_Game, context.Client.RemoteEndPoint, $"Failed to add game state to active game state cache");
+                Battlenet.Common.ActiveAccounts.TryRemove(onlineName, out _);
+                return false;
+            }
+
+            Logging.WriteLine(Logging.LogLevel.Info, Logging.LogType.Client_Game, context.Client.RemoteEndPoint, $"Account [{gameState.Username}] logon success as [{gameState.OnlineName}]");
+            return true;
+        }
+
+        private bool ClientToServer(MessageContext context)
+        {
             Logging.WriteLine(Logging.LogLevel.Debug, Logging.LogType.Client_Game, context.Client.RemoteEndPoint, $"[{Common.DirectionToString(context.Direction)}] {MessageName(Id)} ({4 + Buffer.Length} bytes)");
 
             var gameState = context.Client.GameState;
-
-            if (gameState.Product != Product.ProductCode.WarcraftIIIDemo ||
-                !Settings.GetBoolean(new[] { "battlenet", "emulation", "name_only_logon", "W3DM" }, false, true))
-                throw new GameProtocolViolationException(context.Client, $"{MessageName(Id)} is only supported for name-only logon (see battlenet.emulation.name_only_logon)");
 
             if (Buffer.Length < 34)
                 throw new GameProtocolViolationException(context.Client, $"{MessageName(Id)} buffer must be at least 34 bytes");
 
             if (gameState.ActiveAccount != null)
                 throw new GameProtocolViolationException(context.Client, $"{MessageName(Id)} cannot be sent after logging into an account");
+
+            if (gameState.Product == Product.ProductCode.WarcraftIIIDemo &&
+                Settings.GetBoolean(new[] { "battlenet", "emulation", "name_only_logon", "W3DM" }, false, true))
+                return NameOnlyLogon(context);
+
+            if (gameState.LogonType != GameState.LogonTypes.NLS)
+                throw new GameProtocolViolationException(context.Client, $"{MessageName(Id)} is only supported for NLS logon");
+
+            /**
+             * (UINT8)[32] Client key
+             * (STRING)    Username
+             */
+
+            using var m = new MemoryStream(Buffer);
+            using var r = new BinaryReader(m);
+
+            var clientKey = r.ReadBytes(NLSServer.ValueLength);
+            gameState.Username = r.ReadString();
+            gameState.NLS = null;
+
+            if (!Battlenet.Common.AccountsDb.TryGetValue(gameState.Username, out Account account) || account == null ||
+                !(account.Get(Account.NLSSaltKey, new byte[0]) is byte[] salt) || salt.Length != NLSServer.ValueLength ||
+                !(account.Get(Account.NLSVerifierKey, new byte[0]) is byte[] verifier) || verifier.Length != NLSServer.ValueLength)
+            {
+                Logging.WriteLine(Logging.LogLevel.Info, Logging.LogType.Client_Game, context.Client.RemoteEndPoint, $"Account [{gameState.Username}] does not exist or has no NLS credentials");
+                return ReplyNLS(context, Statuses.DoesNotExist);
+            }
+
+            gameState.NLSClientKey = clientKey;
+            gameState.NLS = new NLSServer(salt, verifier);
+            return ReplyNLS(context, Statuses.Success, gameState.NLS.Salt, gameState.NLS.ServerKey);
+        }
+
+        private bool NameOnlyLogon(MessageContext context)
+        {
+            var gameState = context.Client.GameState;
 
             /**
              * (UINT8)[32] Client key
@@ -91,29 +204,8 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
                 return Reply(context, SID_AUTH_ACCOUNTLOGONPROOF.Statuses.BadPassword);
             }
 
-            gameState.ActiveAccount = account;
-            gameState.FailedLogons = (UInt32)account.Get(Account.FailedLogonsKey, (UInt32)0);
-            gameState.LastLogon = (DateTime)account.Get(Account.LastLogonKey, DateTime.Now);
+            if (!Activate(context, account)) return false;
 
-            account.Set(Account.IPAddressKey, context.Client.RemoteEndPoint.ToString().Split(":")[0]);
-            account.Set(Account.LastLogonKey, DateTime.Now);
-            account.Set(Account.PortKey, context.Client.RemoteEndPoint.ToString().Split(":")[1]);
-
-            var serial = 1;
-            var onlineName = gameState.Username;
-            while (!Battlenet.Common.ActiveAccounts.TryAdd(onlineName, account)) onlineName = $"{gameState.Username}#{++serial}";
-            gameState.OnlineName = onlineName;
-
-            gameState.Username = (string)account.Get(Account.UsernameKey, gameState.Username);
-
-            if (!Battlenet.Common.ActiveGameStates.TryAdd(gameState.OnlineName, gameState))
-            {
-                Logging.WriteLine(Logging.LogLevel.Error, Logging.LogType.Client_Game, context.Client.RemoteEndPoint, $"Failed to add game state to active game state cache");
-                Battlenet.Common.ActiveAccounts.TryRemove(onlineName, out _);
-                return false;
-            }
-
-            Logging.WriteLine(Logging.LogLevel.Info, Logging.LogType.Client_Game, context.Client.RemoteEndPoint, $"Account [{gameState.Username}] logon success as [{gameState.OnlineName}]");
             return Reply(context, SID_AUTH_ACCOUNTLOGONPROOF.Statuses.Success);
         }
     }

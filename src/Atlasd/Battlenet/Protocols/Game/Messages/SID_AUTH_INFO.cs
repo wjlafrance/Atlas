@@ -61,7 +61,7 @@ namespace Atlasd.Battlenet.Protocols.Game.Messages
                         context.Client.GameState.Locale.CountryNameAbbreviated = r.ReadString();
                         context.Client.GameState.Locale.CountryName = r.ReadString();
 
-                        if (context.Client.GameState.Product == Product.ProductCode.WarcraftIIIDemo)
+                        if (Product.IsWarcraftIII(context.Client.GameState.Product))
                             context.Client.GameState.LogonType = GameState.LogonTypes.NLS;
 
                         return new SID_PING().Invoke(new MessageContext(context.Client, MessageDirection.ServerToClient, new Dictionary<string, dynamic>(){{ "token", context.Client.GameState.PingToken }}))
